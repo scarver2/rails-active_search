@@ -21,4 +21,6 @@ RUN set -eux; \
 
 EXPOSE 1433
 
+USER mssql
+
 CMD ["/opt/mssql/bin/sqlservr"]

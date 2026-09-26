@@ -146,6 +146,7 @@ jobs:
 
   test-sqlserver:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -171,7 +172,9 @@ jobs:
 
       - name: Keep SQL Server logs
         if: failure()
-        run: docker compose logs sqlserver
+        run: |
+          docker compose logs sqlserver
+          docker compose exec -T sqlserver sh -c 'for log in /var/opt/mssql/log/SQLFT*; do iconv -f UTF-16LE -t UTF-8 "$log"; done'
 
   test-elasticsearch:
     runs-on: ubuntu-latest

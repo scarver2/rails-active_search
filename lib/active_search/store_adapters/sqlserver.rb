@@ -33,7 +33,7 @@ module ActiveSearch
           "      direction.up do",
           "        execute \"IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') <> 1 THROW 50000, 'SQL Server Full-Text Search is not installed', 1\"",
           "        execute \"IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = '#{CATALOG_NAME}') CREATE FULLTEXT CATALOG [#{CATALOG_NAME}]\"",
-          "        execute \"CREATE FULLTEXT INDEX ON [#{table_name}] (#{columns}) KEY INDEX [#{key_index}] ON [#{CATALOG_NAME}] WITH CHANGE_TRACKING AUTO\"",
+          "        execute \"CREATE FULLTEXT INDEX ON [#{table_name}] (#{columns}) KEY INDEX [#{key_index}] ON [#{CATALOG_NAME}] WITH CHANGE_TRACKING MANUAL\"",
           "      end",
           "    end"
         ]
@@ -88,13 +88,17 @@ module ActiveSearch
 
       private
         def wait_for_population(connection, table_name)
+          start_population(connection, table_name)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + options.fetch(:population_timeout, 120)
           loop do
             object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
             pending_changes = connection.select_value(
               "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPendingChanges')"
             ).to_i
-            break if pending_changes.zero?
+            population_status = connection.select_value(
+              "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPopulateStatus')"
+            ).to_i
+            break if pending_changes.zero? && population_status.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout, "SQL Server full-text population timed out for #{table_name}"
@@ -102,6 +106,18 @@ module ActiveSearch
 
             sleep 0.05
           end
+        end
+
+        def start_population(connection, table_name)
+          quoted_table = connection.quote_table_name(table_name)
+          object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
+          item_count = connection.select_value(
+            "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextItemCount')"
+          ).to_i
+          row_count = connection.select_value("SELECT COUNT_BIG(*) FROM #{quoted_table}").to_i
+          population = item_count.zero? && row_count.positive? ? "FULL" : "UPDATE"
+
+          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START #{population} POPULATION")
         end
 
         def fulltext_key_index_name(table_name)
