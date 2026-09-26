@@ -593,7 +593,7 @@ when "elasticsearch"
 when "opensearch"
   ActiveSearch::StoreAdapters::Opensearch.prepend(TestAutoRefresh)
 when "sqlserver"
-  ActiveSearch::StoreAdapters::Sqlserver.prepend(TestAutoRefresh)
+  ActiveSearch::StoreAdapters::Sqlserver.prepend(TestDeferredRefresh)
 when "meilisearch"
   ActiveSearch::StoreAdapters::Meilisearch.prepend(TestDeferredRefresh)
 end
