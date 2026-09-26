@@ -33,7 +33,7 @@ module ActiveSearch
           "      direction.up do",
           "        execute \"IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') <> 1 THROW 50000, 'SQL Server Full-Text Search is not installed', 1\"",
           "        execute \"IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = '#{CATALOG_NAME}') CREATE FULLTEXT CATALOG [#{CATALOG_NAME}]\"",
-          "        execute \"CREATE FULLTEXT INDEX ON [#{table_name}] (#{columns}) KEY INDEX [#{key_index}] ON [#{CATALOG_NAME}] WITH CHANGE_TRACKING MANUAL\"",
+          "        execute \"CREATE FULLTEXT INDEX ON [#{table_name}] (#{columns}) KEY INDEX [#{key_index}] ON [#{CATALOG_NAME}] WITH CHANGE_TRACKING AUTO\"",
           "      end",
           "    end"
         ]
@@ -70,9 +70,6 @@ module ActiveSearch
         model = connection_model_for(index)
         connection = model.connection
 
-        connection.execute(
-          "ALTER FULLTEXT INDEX ON #{connection.quote_table_name(model.table_name)} START UPDATE POPULATION"
-        )
         wait_for_population(connection, model.table_name)
       end
 
@@ -94,10 +91,13 @@ module ActiveSearch
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + options.fetch(:population_timeout, 120)
           loop do
             object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
-            active = connection.select_value(
+            active_populations = connection.select_value(
               "SELECT COUNT(*) FROM sys.dm_fts_index_population WHERE table_id = #{object_id}"
             ).to_i
-            break if active.zero?
+            pending_changes = connection.select_value(
+              "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPendingChanges')"
+            ).to_i
+            break if active_populations.zero? && pending_changes.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout, "SQL Server full-text population timed out for #{table_name}"

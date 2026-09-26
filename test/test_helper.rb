@@ -32,7 +32,7 @@ if ENV["SEARCH_ADAPTER"] == "sqlserver"
   }.each do |table, columns|
     next unless connection.table_exists?(table)
     if connection.select_value("SELECT OBJECTPROPERTY(OBJECT_ID('#{table}'), 'TableHasActiveFulltextIndex')") == 1
-      connection.execute("ALTER FULLTEXT INDEX ON [#{table}] SET CHANGE_TRACKING MANUAL")
+      connection.execute("ALTER FULLTEXT INDEX ON [#{table}] SET CHANGE_TRACKING AUTO")
       next
     end
 
@@ -40,7 +40,7 @@ if ENV["SEARCH_ADAPTER"] == "sqlserver"
     key_index = "index_#{table}_on_id_for_fulltext"
     connection.execute(
       "CREATE FULLTEXT INDEX ON [#{table}] (#{fields}) KEY INDEX [#{key_index}] " \
-        "ON [active_search] WITH CHANGE_TRACKING MANUAL"
+        "ON [active_search] WITH CHANGE_TRACKING AUTO"
     )
   end
 end
