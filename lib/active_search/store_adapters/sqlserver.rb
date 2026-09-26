@@ -91,13 +91,10 @@ module ActiveSearch
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + options.fetch(:population_timeout, 120)
           loop do
             object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
-            active_populations = connection.select_value(
-              "SELECT COUNT(*) FROM sys.dm_fts_index_population WHERE table_id = #{object_id}"
-            ).to_i
             pending_changes = connection.select_value(
               "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPendingChanges')"
             ).to_i
-            break if active_populations.zero? && pending_changes.zero?
+            break if pending_changes.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout, "SQL Server full-text population timed out for #{table_name}"
