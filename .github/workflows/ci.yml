@@ -144,6 +144,35 @@ jobs:
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
 
+  test-sqlserver:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@a0102e0972be65f351c307e2d64b9314a57c8073 # v1.324.0
+        with:
+          ruby-version: ruby-3.4.7
+          bundler-cache: true
+
+      - name: Start SQL Server with Full-Text Search
+        run: docker compose up --build --wait sqlserver
+
+      - name: Create test database
+        run: docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'ActiveSearch-SQL2026!' -C -Q "CREATE DATABASE active_search_test"
+
+      - name: Run SQL Server tests
+        env:
+          RAILS_ENV: test
+          SEARCH_ADAPTER: sqlserver
+          SQLSERVER_PASSWORD: ActiveSearch-SQL2026!
+        run: bin/rails db:test:prepare && bin/rails test
+
+      - name: Keep SQL Server logs
+        if: failure()
+        run: docker compose logs sqlserver
+
   test-elasticsearch:
     runs-on: ubuntu-latest
     services:

@@ -17,6 +17,7 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.datetime "created_at", null: false
     t.string "title"
     t.datetime "updated_at", null: false
+    t.index ["id"], name: "index_admin_documents_on_id_for_fulltext", unique: true
   end
 
   create_table "article_documents", force: :cascade do |t|
@@ -29,6 +30,7 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.string "status"
     t.text "title"
     t.index ["article_id"], name: "index_article_documents_on_article_id", unique: true
+    t.index ["id"], name: "index_article_documents_on_id_for_fulltext", unique: true
   end
 
   create_table "articles", force: :cascade do |t|
@@ -36,7 +38,7 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.text "content"
     t.datetime "created_at", null: false
     t.boolean "featured", default: false
-    t.bigint "priority"
+    t.integer "priority"
     t.datetime "published_at"
     t.string "status", default: "published"
     t.string "title"
@@ -59,6 +61,7 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.string "comment_id", null: false
     t.datetime "published_at"
     t.index ["comment_id"], name: "index_comment_documents_on_comment_id", unique: true
+    t.index ["id"], name: "index_comment_documents_on_id_for_fulltext", unique: true
   end
 
   create_table "comments", force: :cascade do |t|
@@ -84,6 +87,7 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.string "guarded_article_id", null: false
     t.text "title"
     t.index ["guarded_article_id"], name: "index_guarded_article_documents_on_guarded_article_id", unique: true
+    t.index ["id"], name: "index_guarded_article_documents_on_id_for_fulltext", unique: true
   end
 
   create_table "pages", force: :cascade do |t|
@@ -117,6 +121,7 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.string "proc_guarded_article_id", null: false
     t.string "status"
     t.text "title"
+    t.index ["id"], name: "index_proc_guarded_article_documents_on_id_for_fulltext", unique: true
     t.index ["proc_guarded_article_id"], name: "idx_proc_guarded_article_docs_on_id", unique: true
   end
 
@@ -137,6 +142,7 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.string "record_id", null: false
     t.string "record_type", null: false
     t.text "title"
+    t.index ["id"], name: "index_record_documents_on_id_for_fulltext", unique: true
     t.index ["record_type", "record_id"], name: "index_record_documents_on_record_type_and_record_id", unique: true
   end
 
@@ -145,23 +151,25 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.text "content"
     t.text "title"
     t.index ["article_id"], name: "index_search_namespaced_test_documents_on_article_id", unique: true
+    t.index ["id"], name: "index_search_namespaced_test_documents_on_id_for_fulltext", unique: true
   end
 
   create_table "topic_documents", force: :cascade do |t|
     t.bigint "account_id"
-    t.json "folder_ids"
-    t.json "labels"
-    t.json "seen_at"
+    t.text "folder_ids"
+    t.text "labels"
+    t.text "seen_at"
     t.text "subject"
     t.string "topic_id", null: false
+    t.index ["id"], name: "index_topic_documents_on_id_for_fulltext", unique: true
     t.index ["topic_id"], name: "index_topic_documents_on_topic_id", unique: true
   end
 
   create_table "topics", force: :cascade do |t|
     t.bigint "account_id"
-    t.json "folder_ids"
-    t.json "labels"
-    t.json "seen_at"
+    t.text "folder_ids"
+    t.text "labels"
+    t.text "seen_at"
     t.string "subject"
   end
 
@@ -177,19 +185,9 @@ ActiveRecord::Schema[8.1].define(version: 2024_01_01_000020) do
     t.text "content"
     t.text "title"
     t.string "unless_guarded_article_id", null: false
+    t.index ["id"], name: "index_unless_guarded_article_documents_on_id_for_fulltext", unique: true
     t.index ["unless_guarded_article_id"], name: "idx_unless_guarded_article_docs_on_id", unique: true
   end
 
   add_foreign_key "products", "authors"
-
-  # Virtual tables defined in this database.
-  # Note that virtual tables may not work with other database engines. Be careful if changing database.
-  create_virtual_table "article_documents_fts", "fts5", ["title", "content"]
-  create_virtual_table "comment_documents_fts", "fts5", ["body"]
-  create_virtual_table "guarded_article_documents_fts", "fts5", ["title", "content"]
-  create_virtual_table "proc_guarded_article_documents_fts", "fts5", ["title", "content"]
-  create_virtual_table "record_documents_fts", "fts5", ["title", "body"]
-  create_virtual_table "search_namespaced_test_documents_fts", "fts5", ["title", "content"]
-  create_virtual_table "topic_documents_fts", "fts5", ["subject"]
-  create_virtual_table "unless_guarded_article_documents_fts", "fts5", ["title", "content"]
 end

@@ -6,6 +6,45 @@ BackendLock.acquire(ENV.fetch("SEARCH_ADAPTER", "sqlite"))
 
 require_relative "../test/dummy/config/environment"
 
+# Active Record's Ruby schema dumper preserves SQL Server's unique FTS key indexes but cannot
+# represent full-text catalogs or indexes. Rebuild that native-only part after test schema load.
+if ENV["SEARCH_ADAPTER"] == "sqlserver"
+  connection = ActiveRecord::Base.connection
+  connection.execute(
+    "IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') <> 1 " \
+      "THROW 50000, 'SQL Server Full-Text Search is not installed', 1"
+  )
+  connection.execute(
+    "IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = 'active_search') " \
+      "CREATE FULLTEXT CATALOG [active_search]"
+  )
+
+  {
+    article_documents: %i[ title content ],
+    record_documents: %i[ title body ],
+    comment_documents: %i[ body ],
+    admin_documents: %i[ title body ],
+    guarded_article_documents: %i[ title content ],
+    unless_guarded_article_documents: %i[ title content ],
+    proc_guarded_article_documents: %i[ title content ],
+    search_namespaced_test_documents: %i[ title content ],
+    topic_documents: %i[ subject ]
+  }.each do |table, columns|
+    next unless connection.table_exists?(table)
+    if connection.select_value("SELECT OBJECTPROPERTY(OBJECT_ID('#{table}'), 'TableHasActiveFulltextIndex')") == 1
+      connection.execute("ALTER FULLTEXT INDEX ON [#{table}] SET CHANGE_TRACKING MANUAL")
+      next
+    end
+
+    fields = columns.map { |column| "[#{column}] LANGUAGE 1033" }.join(", ")
+    key_index = "index_#{table}_on_id_for_fulltext"
+    connection.execute(
+      "CREATE FULLTEXT INDEX ON [#{table}] (#{fields}) KEY INDEX [#{key_index}] " \
+        "ON [active_search] WITH CHANGE_TRACKING MANUAL"
+    )
+  end
+end
+
 # A stand-in record for testing Index#add with arbitrary document data.
 class TestRecord
   include GlobalID::Identification
@@ -131,7 +170,7 @@ class ActiveSupport::TestCase
         setup_meilisearch_index(index_name, index_instance)
       when :solr
         setup_solr_core(index_name, index_instance)
-      when :sqlite, :mysql, :postgresql
+      when :sqlite, :mysql, :postgresql, :sqlserver
         clean_search_document_for(index_name)
       else
         rebuild_search_index(index_instance)
@@ -553,6 +592,8 @@ when "elasticsearch"
   ActiveSearch::StoreAdapters::Elasticsearch.prepend(TestAutoRefresh)
 when "opensearch"
   ActiveSearch::StoreAdapters::Opensearch.prepend(TestAutoRefresh)
+when "sqlserver"
+  ActiveSearch::StoreAdapters::Sqlserver.prepend(TestAutoRefresh)
 when "meilisearch"
   ActiveSearch::StoreAdapters::Meilisearch.prepend(TestDeferredRefresh)
 end

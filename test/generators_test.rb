@@ -53,7 +53,7 @@ class GeneratorsTest < ActiveSupport::TestCase
       assert_equal name.to_s, parsed.dig("development", "adapter"), name
       assert_equal name.to_s, parsed.dig("test", "adapter"), name
 
-      if %i[ sqlite mysql postgresql ].include?(name)
+      if %i[ sqlite mysql postgresql sqlserver ].include?(name)
         assert_nil parsed.dig("development", "index_prefix"), name
         assert_nil parsed.dig("test", "index_prefix"), name
       else
