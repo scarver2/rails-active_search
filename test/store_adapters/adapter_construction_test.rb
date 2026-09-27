@@ -17,7 +17,8 @@ class AdapterConstructionTest < ActiveSupport::TestCase
     manticore: { host: UNREACHABLE_HOST, port: UNREACHABLE_PORT },
     postgresql: {},
     mysql: {},
-    sqlite: {}
+    sqlite: {},
+    sqlserver: {}
   }.freeze
 
   test "every built-in adapter name resolves to a class that inherits from Base" do

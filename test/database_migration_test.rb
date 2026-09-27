@@ -284,11 +284,11 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
     assert_no_match(/adapter_name|case adapter/, ruby)
 
     expected = { sqlite: "create_virtual_table", postgresql: ":title_vector, :tsvector",
-                 mysql: "type: :fulltext" }.fetch(store_adapter_name)
+                 mysql: "type: :fulltext", sqlserver: "CREATE FULLTEXT INDEX" }.fetch(store_adapter_name)
     assert_match expected, ruby
 
     ({ sqlite: "tsvector", postgresql: "create_virtual_table",
-       mysql: "create_virtual_table" }).each do |adapter, absent|
+       mysql: "create_virtual_table", sqlserver: "create_virtual_table" }).each do |adapter, absent|
       assert_no_match(/#{absent}/, ruby) if adapter == store_adapter_name
     end
   end
@@ -389,7 +389,7 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
 
   private
     def narrowable?
-      %i[ postgresql mysql ].include?(store_adapter_name)
+      %i[ postgresql mysql sqlserver ].include?(store_adapter_name)
     end
 
     def account_id_column
@@ -403,6 +403,7 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
       case store_adapter_name
       when :postgresql then connection.execute("ALTER TABLE #{table} ALTER COLUMN account_id TYPE integer")
       when :mysql then connection.execute("ALTER TABLE #{table} MODIFY account_id INT")
+      when :sqlserver then connection.execute("ALTER TABLE #{table} ALTER COLUMN account_id int")
       when :sqlite
         connection.execute("ALTER TABLE #{table} DROP COLUMN account_id")
         connection.execute("ALTER TABLE #{table} ADD COLUMN account_id INTEGER")
@@ -429,11 +430,11 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
     end
 
     def retype_status_to_text
-      retype_status(postgresql: "text", mysql: "TEXT", sqlite: "TEXT")
+      retype_status(postgresql: "text", mysql: "TEXT", sqlite: "TEXT", sqlserver: "nvarchar(max)")
     end
 
     def retype_status_to_integer
-      retype_status(postgresql: "integer", mysql: "INT", sqlite: "INTEGER")
+      retype_status(postgresql: "integer", mysql: "INT", sqlite: "INTEGER", sqlserver: "bigint")
     end
 
     def retype_status(**types)
@@ -444,6 +445,7 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
       case store_adapter_name
       when :postgresql then connection.execute("ALTER TABLE #{table} ALTER COLUMN status TYPE #{type} USING NULL")
       when :mysql then connection.execute("ALTER TABLE #{table} MODIFY status #{type}")
+      when :sqlserver then connection.execute("ALTER TABLE #{table} ALTER COLUMN status #{type}")
       when :sqlite
         connection.execute("ALTER TABLE #{table} DROP COLUMN status")
         connection.execute("ALTER TABLE #{table} ADD COLUMN status #{type}")
@@ -451,7 +453,7 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
     end
 
     def database_adapter?
-      %i[ sqlite mysql postgresql ].include?(store_adapter_name)
+      %i[ sqlite mysql postgresql sqlserver ].include?(store_adapter_name)
     end
 
     def table_exists?
