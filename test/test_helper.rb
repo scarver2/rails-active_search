@@ -43,6 +43,19 @@ if ENV["SEARCH_ADAPTER"] == "sqlserver"
         "ON [active_search] WITH CHANGE_TRACKING MANUAL"
     )
   end
+
+  deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 30
+  loop do
+    populations = connection.select_value(
+      "SELECT COUNT(*) FROM sys.fulltext_indexes " \
+        "WHERE OBJECTPROPERTYEX(object_id, 'TableFulltextPopulateStatus') <> 0"
+    ).to_i
+    break if populations.zero?
+
+    raise "SQL Server initial full-text population timed out" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+    sleep 0.05
+  end
 end
 
 # A stand-in record for testing Index#add with arbitrary document data.
