@@ -101,7 +101,9 @@ module ActiveSearch
             break if pending_changes.zero? && population_status.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-              raise ActiveRecord::StatementTimeout, "SQL Server full-text population timed out for #{table_name}"
+              raise ActiveRecord::StatementTimeout,
+                "SQL Server full-text population timed out for #{table_name} " \
+                  "(pending changes: #{pending_changes}, population status: #{population_status})"
             end
 
             sleep 0.05
