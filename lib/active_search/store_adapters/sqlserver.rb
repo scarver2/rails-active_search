@@ -61,8 +61,11 @@ module ActiveSearch
       def write(index, document, routing: nil)
         key = index.source.storage_key(document.id)
         columns = document.writable_field_names - key.keys
+        model = model_for(index, routing: routing)
 
-        model_for(index, routing: routing).upsert(key.merge(replacement_attributes(document, columns)))
+        model.transaction(requires_new: true) do
+          model.upsert(key.merge(replacement_attributes(document, columns)))
+        end
       end
 
       def refresh(index_name)
