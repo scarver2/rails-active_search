@@ -168,19 +168,32 @@ jobs:
         run: docker compose up --build --wait sqlserver
 
       - name: Create test database
-        run: docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -Q "CREATE DATABASE active_search_test"
+        run: |
+          for attempt in {1..30}; do
+            if docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd \
+              -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C \
+              -Q "CREATE DATABASE active_search_test"; then
+              exit 0
+            fi
+
+            echo "SQL Server is not ready for database creation (attempt $attempt/30)"
+            sleep 5
+          done
+
+          exit 1
 
       - name: Run SQL Server tests
         env:
           RAILS_ENV: test
           SEARCH_ADAPTER: sqlserver
-        run: bin/rails db:test:prepare && bin/rails test test/reindex_test.rb -n /touch_reindexes_the_index/
+        run: bin/rails db:test:prepare && bin/rails test
 
       - name: Keep SQL Server logs
         if: failure()
         run: |
           docker compose logs sqlserver
-          docker compose exec -T sqlserver sh -c 'for log in /var/opt/mssql/log/SQLFT*; do iconv -f UTF-16LE -t UTF-8 "$log"; done'
+          docker compose exec -T sqlserver sh -c \
+            'find /var/opt/mssql/log -maxdepth 1 -name "SQLFT*" -type f -exec iconv -f UTF-16LE -t UTF-8 {} \;'
 
   test-elasticsearch:
     runs-on: ubuntu-latest

@@ -91,39 +91,56 @@ module ActiveSearch
 
       private
         def wait_for_population(connection, table_name)
-          start_population(connection, table_name)
+          object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
+          previous_start_time = connection.uncached do
+            connection.select_value(<<~SQL.squish)
+              SELECT crawl_start_date
+              FROM sys.fulltext_indexes
+              WHERE object_id = #{object_id}
+            SQL
+          end
+          start_population(connection, table_name, full: previous_start_time.nil?)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + options.fetch(:population_timeout, 120)
           loop do
-            object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
-            pending_changes = connection.select_value(
-              "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPendingChanges')"
-            ).to_i
-            population_status = connection.select_value(
-              "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPopulateStatus')"
-            ).to_i
-            active_populations = connection.select_value(<<~SQL.squish).to_i
-              SELECT COUNT(*)
-              FROM sys.dm_fts_index_population
-              WHERE database_id = DB_ID()
-                AND table_id = #{object_id}
-            SQL
-            break if pending_changes.zero?
+            pending_changes, population_status, population = connection.uncached do
+              [
+                connection.select_value(
+                  "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPendingChanges')"
+                ).to_i,
+                connection.select_value(
+                  "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPopulateStatus')"
+                ).to_i,
+                connection.select_one(<<~SQL.squish)
+                  SELECT crawl_start_date, has_crawl_completed
+                  FROM sys.fulltext_indexes
+                  WHERE object_id = #{object_id}
+                SQL
+              ]
+            end
+            population_started = population.fetch("crawl_start_date") != previous_start_time
+            crawl_completed = [ true, 1 ].include?(population.fetch("has_crawl_completed"))
+            break if population_started && crawl_completed && pending_changes.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout,
                 "SQL Server full-text population timed out for #{table_name} " \
-                  "(pending changes: #{pending_changes}, population status: #{population_status}, " \
-                  "active populations: #{active_populations})"
+                  "(pending changes: #{pending_changes}, population status: #{population_status})"
+            end
+
+            if population_started && crawl_completed && population_status.zero?
+              previous_start_time = population.fetch("crawl_start_date")
+              start_population(connection, table_name)
             end
 
             sleep 0.05
           end
         end
 
-        def start_population(connection, table_name)
+        def start_population(connection, table_name, full: false)
           quoted_table = connection.quote_table_name(table_name)
+          population = full ? "FULL" : "UPDATE"
 
-          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START FULL POPULATION")
+          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START #{population} POPULATION")
         end
 
         def fulltext_key_index_name(table_name)

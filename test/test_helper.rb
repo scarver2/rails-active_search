@@ -32,29 +32,16 @@ if ENV["SEARCH_ADAPTER"] == "sqlserver"
   }.each do |table, columns|
     next unless connection.table_exists?(table)
     if connection.select_value("SELECT OBJECTPROPERTY(OBJECT_ID('#{table}'), 'TableHasActiveFulltextIndex')") == 1
-      connection.execute("ALTER FULLTEXT INDEX ON [#{table}] SET CHANGE_TRACKING MANUAL")
-      next
+      connection.execute("DROP FULLTEXT INDEX ON [#{table}]")
     end
 
     fields = columns.map { |column| "[#{column}] LANGUAGE 1033" }.join(", ")
     key_index = "index_#{table}_on_id_for_fulltext"
     connection.execute(
       "CREATE FULLTEXT INDEX ON [#{table}] (#{fields}) KEY INDEX [#{key_index}] " \
-        "ON [active_search] WITH CHANGE_TRACKING MANUAL"
+        "ON [active_search] WITH CHANGE_TRACKING OFF, NO POPULATION"
     )
-  end
-
-  deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 30
-  loop do
-    populations = connection.select_value(
-      "SELECT COUNT(*) FROM sys.fulltext_indexes " \
-        "WHERE OBJECTPROPERTYEX(object_id, 'TableFulltextPopulateStatus') <> 0"
-    ).to_i
-    break if populations.zero?
-
-    raise "SQL Server initial full-text population timed out" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-    sleep 0.05
+    connection.execute("ALTER FULLTEXT INDEX ON [#{table}] SET CHANGE_TRACKING MANUAL")
   end
 end
 
