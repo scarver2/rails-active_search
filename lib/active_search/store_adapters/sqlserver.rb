@@ -98,14 +98,22 @@ module ActiveSearch
             population_status = connection.select_value(
               "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPopulateStatus')"
             ).to_i
-            break if pending_changes.zero? && population_status.zero?
+            active_populations = connection.select_value(<<~SQL.squish).to_i
+              SELECT COUNT(*)
+              FROM sys.dm_fts_index_population
+              WHERE database_id = DB_ID()
+                AND table_id = #{object_id}
+            SQL
+            break if pending_changes.zero? && active_populations.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout,
                 "SQL Server full-text population timed out for #{table_name} " \
-                  "(pending changes: #{pending_changes}, population status: #{population_status})"
+                  "(pending changes: #{pending_changes}, population status: #{population_status}, " \
+                  "active populations: #{active_populations})"
             end
 
+            start_population(connection, table_name) if pending_changes.positive? && active_populations.zero?
             sleep 0.05
           end
         end

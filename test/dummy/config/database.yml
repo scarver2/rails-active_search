@@ -33,7 +33,7 @@ sqlserver: &sqlserver
   host: <%= ENV.fetch("SQLSERVER_HOST", "127.0.0.1") %>
   port: <%= ENV.fetch("SQLSERVER_PORT", 1433) %>
   username: <%= ENV.fetch("SQLSERVER_USER", "sa") %>
-  password: <%= ENV.fetch("SQLSERVER_PASSWORD", "ActiveSearch-SQL2026!") %>
+  password: <%= ENV.fetch("SQLSERVER_PASSWORD") %>
   login_timeout: 120
   timeout: 120
   schema_dump: schema_sqlserver.rb

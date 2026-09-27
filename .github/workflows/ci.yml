@@ -157,17 +157,23 @@ jobs:
           ruby-version: ruby-3.4.7
           bundler-cache: true
 
+      - name: Generate SQL Server password
+        run: |
+          password="Sql1!$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          echo "MSSQL_SA_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "SQLSERVER_PASSWORD=$password" >> "$GITHUB_ENV"
+
       - name: Start SQL Server with Full-Text Search
         run: docker compose up --build --wait sqlserver
 
       - name: Create test database
-        run: docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'ActiveSearch-SQL2026!' -C -Q "CREATE DATABASE active_search_test"
+        run: docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -Q "CREATE DATABASE active_search_test"
 
       - name: Run SQL Server tests
         env:
           RAILS_ENV: test
           SEARCH_ADAPTER: sqlserver
-          SQLSERVER_PASSWORD: ActiveSearch-SQL2026!
         run: bin/rails db:test:prepare && bin/rails test test/reindex_test.rb -n /touch_reindexes_the_index/
 
       - name: Keep SQL Server logs
