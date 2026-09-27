@@ -168,7 +168,7 @@ jobs:
           RAILS_ENV: test
           SEARCH_ADAPTER: sqlserver
           SQLSERVER_PASSWORD: ActiveSearch-SQL2026!
-        run: bin/rails db:test:prepare && bin/rails test
+        run: bin/rails db:test:prepare && bin/rails test test/reindex_test.rb -n /touch_reindexes_the_index/
 
       - name: Keep SQL Server logs
         if: failure()
