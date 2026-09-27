@@ -104,7 +104,7 @@ module ActiveSearch
               WHERE database_id = DB_ID()
                 AND table_id = #{object_id}
             SQL
-            break if pending_changes.zero? && active_populations.zero?
+            break if pending_changes.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout,
@@ -113,21 +113,14 @@ module ActiveSearch
                   "active populations: #{active_populations})"
             end
 
-            start_population(connection, table_name) if pending_changes.positive? && active_populations.zero?
             sleep 0.05
           end
         end
 
         def start_population(connection, table_name)
           quoted_table = connection.quote_table_name(table_name)
-          object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
-          item_count = connection.select_value(
-            "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextItemCount')"
-          ).to_i
-          row_count = connection.select_value("SELECT COUNT_BIG(*) FROM #{quoted_table}").to_i
-          population = item_count.zero? && row_count.positive? ? "FULL" : "UPDATE"
 
-          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START #{population} POPULATION")
+          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START FULL POPULATION")
         end
 
         def fulltext_key_index_name(table_name)
