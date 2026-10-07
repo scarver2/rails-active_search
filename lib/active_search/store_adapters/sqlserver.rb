@@ -117,13 +117,6 @@ module ActiveSearch
       private
         def wait_for_population(connection, table_name)
           object_id = connection.select_value("SELECT OBJECT_ID(#{connection.quote(table_name)})").to_i
-          previous_start_time = connection.uncached do
-            connection.select_value(<<~SQL.squish)
-              SELECT crawl_start_date
-              FROM sys.fulltext_indexes
-              WHERE object_id = #{object_id}
-            SQL
-          end
           start_population(connection, table_name)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + options.fetch(:population_timeout, 120)
           population_observed = false
@@ -137,26 +130,20 @@ module ActiveSearch
                   "SELECT OBJECTPROPERTYEX(#{object_id}, 'TableFulltextPopulateStatus')"
                 ).to_i,
                 connection.select_one(<<~SQL.squish)
-                  SELECT crawl_start_date, has_crawl_completed
+                  SELECT has_crawl_completed
                   FROM sys.fulltext_indexes
                   WHERE object_id = #{object_id}
                 SQL
               ]
             end
-            population_started = population.fetch("crawl_start_date") != previous_start_time
             crawl_completed = [ true, 1 ].include?(population.fetch("has_crawl_completed"))
             population_observed ||= population_status.nonzero? || !crawl_completed
-            break if population_observed && population_started && crawl_completed && population_status.zero?
+            break if population_observed && crawl_completed && population_status.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout,
                 "SQL Server full-text population timed out for #{table_name} " \
                   "(pending changes: #{pending_changes}, population status: #{population_status})"
-            end
-
-            if population_started && crawl_completed && population_status.zero?
-              previous_start_time = population.fetch("crawl_start_date")
-              start_population(connection, table_name)
             end
 
             sleep 0.05
