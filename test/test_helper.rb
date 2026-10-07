@@ -549,7 +549,7 @@ module TestDeferredRefresh
   # A bulk write is a write: without this the clear fires at read time and empties what was written.
   def flush_batch(index, operations, **)
     flush_clear(index)
-    super
+    super.tap { pending_refreshes << index.index_name }
   end
 
   # An explicit refresh only marks the index; the read is the only place the answer must be right.

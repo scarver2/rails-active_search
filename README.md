@@ -801,6 +801,7 @@ capabilities.supports_snippet_unit?(:words)     # or :characters
 | PostgreSQL | yes | words | yes | yes | no | yes | no | no | yes |
 | SQLite | yes | words | yes | yes | no | yes | no | no | yes |
 | MySQL | no | none | no | no | no | yes | no | no | no |
+| SQL Server | no | none | no | no | no | yes | no | no | yes |
 | Redis Search | yes | none | no | no | no | yes | no | no | no |
 | Manticore | yes | characters | no | no | no | no | no | no | yes |
 
@@ -845,6 +846,7 @@ digest.
 | Redis Stack | `7.4.0-v8` |
 | Manticore | `29.0.2` |
 | MySQL | `8.4` |
+| SQL Server | `2022` |
 | PostgreSQL | `18` |
 | SQLite | whatever the `sqlite3` gem bundles |
 

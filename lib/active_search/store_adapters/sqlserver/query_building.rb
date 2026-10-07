@@ -38,6 +38,22 @@ module ActiveSearch
               .joins("INNER JOIN #{fulltext} ON #{table}.#{primary_key} = [active_search_fts].[KEY]")
           end
 
+          # SQL Server has no boolean scalar type, so COALESCE(predicate, false) is invalid SQL.
+          # CASE preserves Active Search's rule that a rejected predicate which evaluates to NULL
+          # is treated as false and therefore keeps the document.
+          def apply_not_filter(scope, field, value)
+            ast = scope.klass.all.where(field => value).where_clause.ast
+            apply_nullable_negation(scope, ast)
+          end
+
+          def apply_not_group(scope, group, definition)
+            branches = group.branches.map do |branch|
+              branch.reduce(scope.klass.all) { |s, condition| apply_positive(s, condition, definition) }
+            end
+
+            apply_nullable_negation(scope, branches.reduce { |a, b| a.or(b) }.where_clause.ast)
+          end
+
           # Active Search does not expose SQL Server's full CONTAINS grammar. Quoting each plain
           # term keeps operators and punctuation as data, while preserving a balanced user phrase.
           def sanitize_contains_query(query)
@@ -62,6 +78,14 @@ module ActiveSearch
 
           def quote_contains_term(term)
             %("#{term.gsub('"', '""')}")
+          end
+
+          def apply_nullable_negation(scope, predicate)
+            expression = Arel::Nodes::Case.new
+              .when(predicate).then(Arel::Nodes.build_quoted(1))
+              .else(Arel::Nodes.build_quoted(0))
+
+            scope.where(expression.eq(0))
           end
       end
     end

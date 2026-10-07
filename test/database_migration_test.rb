@@ -183,7 +183,10 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
   test "a table whose text column has no search index is incompatible, not compatible" do
     skip "SQLite keeps its text in a separate table" if store_adapter_name == :sqlite
 
-    without_search_index = @source.to_ruby.gsub(/^ *(add_index.*fulltext|add_column.*tsvector|add_index.*gin).*\n/, "")
+    without_search_index = @source.to_ruby.gsub(
+      /^ *(add_index.*fulltext|add_column.*tsvector|add_index.*gin|execute.*CREATE FULLTEXT INDEX).*\n/,
+      ""
+    )
     assert_no_match(/type: :fulltext|:tsvector|using: :gin/, without_search_index,
       "the strip left a search line behind")
 

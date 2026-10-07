@@ -35,6 +35,9 @@ module ActiveSearch
           "        execute \"IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = '#{CATALOG_NAME}') CREATE FULLTEXT CATALOG [#{CATALOG_NAME}]\"",
           "        execute \"CREATE FULLTEXT INDEX ON [#{table_name}] (#{columns}) KEY INDEX [#{key_index}] ON [#{CATALOG_NAME}] WITH CHANGE_TRACKING MANUAL\"",
           "      end",
+          "      direction.down do",
+          "        execute \"DROP FULLTEXT INDEX ON [#{table_name}]\"",
+          "      end",
           "    end"
         ]
       end
@@ -66,6 +69,28 @@ module ActiveSearch
         model.transaction(requires_new: true) do
           model.upsert(key.merge(replacement_attributes(document, columns)))
         end
+      end
+
+      def replacement_attributes(document, names)
+        super.transform_values do |value|
+          value.is_a?(Array) ? ActiveSupport::JSON.encode(value) : value
+        end
+      end
+
+      def execute_query(index, raw_query, query_context, routing: nil)
+        super.tap do |response|
+          collection_names = index.definition.fields.select(&:multiple?).map(&:name)
+          response[:results].each do |result|
+            collection_names.each do |name|
+              value = result[:fields][name]
+              result[:fields][name] = ActiveSupport::JSON.decode(value) if value.is_a?(String)
+            end
+          end
+        end
+      end
+
+      def type_casters
+        @type_casters ||= super.merge(datetime: ActiveModel::Type::DateTime.new)
       end
 
       def refresh(index_name)
