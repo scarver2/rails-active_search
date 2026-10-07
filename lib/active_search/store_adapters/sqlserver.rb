@@ -146,8 +146,7 @@ module ActiveSearch
             population_started = population.fetch("crawl_start_date") != previous_start_time
             crawl_completed = [ true, 1 ].include?(population.fetch("has_crawl_completed"))
             population_observed ||= population_status.nonzero? || !crawl_completed
-            break if population_observed && population_started && crawl_completed &&
-              population_status.zero? && pending_changes.zero?
+            break if population_observed && population_started && crawl_completed && population_status.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout,
