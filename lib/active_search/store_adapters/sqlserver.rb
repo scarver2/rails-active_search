@@ -124,7 +124,7 @@ module ActiveSearch
               WHERE object_id = #{object_id}
             SQL
           end
-          start_population(connection, table_name, full: previous_start_time.nil?)
+          start_population(connection, table_name)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + options.fetch(:population_timeout, 120)
           population_observed = false
           loop do
@@ -168,11 +168,10 @@ module ActiveSearch
           sleep 0.05
         end
 
-        def start_population(connection, table_name, full: false)
+        def start_population(connection, table_name)
           quoted_table = connection.quote_table_name(table_name)
-          population = full ? "FULL" : "UPDATE"
 
-          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START #{population} POPULATION")
+          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START FULL POPULATION")
         end
 
         def fulltext_key_index_name(table_name)
