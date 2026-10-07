@@ -563,6 +563,14 @@ module TestDeferredRefresh
     super
   end
 
+  # to_native_query builds a database relation without going through #search, but that relation
+  # must see the same deferred writes when it is executed.
+  def build_query(index, query_context, **)
+    flush_clear(index)
+    refresh_pending(index.index_name)
+    super
+  end
+
   def remove_by_filter(index, query_context, **)
     flush_clear(index)
     refresh_pending(index.index_name)

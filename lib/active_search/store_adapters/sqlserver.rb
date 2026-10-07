@@ -162,6 +162,10 @@ module ActiveSearch
 
             sleep 0.05
           end
+
+          # SQL Server can report the crawl complete just before CONTAINSTABLE sees its new
+          # fragment. Give the full-text host one polling interval to publish that fragment.
+          sleep 0.05
         end
 
         def start_population(connection, table_name, full: false)
