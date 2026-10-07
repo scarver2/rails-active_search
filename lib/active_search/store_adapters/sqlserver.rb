@@ -126,6 +126,7 @@ module ActiveSearch
           end
           start_population(connection, table_name, full: previous_start_time.nil?)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + options.fetch(:population_timeout, 120)
+          population_observed = false
           loop do
             pending_changes, population_status, population = connection.uncached do
               [
@@ -144,7 +145,9 @@ module ActiveSearch
             end
             population_started = population.fetch("crawl_start_date") != previous_start_time
             crawl_completed = [ true, 1 ].include?(population.fetch("has_crawl_completed"))
-            break if population_started && crawl_completed && pending_changes.zero?
+            population_observed ||= population_status.nonzero? || !crawl_completed
+            break if population_observed && population_started && crawl_completed &&
+              population_status.zero? && pending_changes.zero?
 
             if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
               raise ActiveRecord::StatementTimeout,
