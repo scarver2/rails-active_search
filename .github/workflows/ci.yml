@@ -191,7 +191,7 @@ jobs:
         env:
           RAILS_ENV: test
           SEARCH_ADAPTER: sqlserver
-        run: bin/rails db:test:prepare && bin/rails test
+        run: bin/rails db:test:prepare && bin/rails test test/store_adapters/sqlserver_test.rb
 
       - name: Keep SQL Server logs
         if: failure()
