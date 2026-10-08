@@ -151,7 +151,11 @@ jobs:
 
   test-sqlserver:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -191,7 +195,16 @@ jobs:
         env:
           RAILS_ENV: test
           SEARCH_ADAPTER: sqlserver
-        run: bin/rails db:test:prepare && bin/rails test test/store_adapters/sqlserver_test.rb
+        run: |
+          bin/rails db:test:prepare
+          mapfile -t test_files < <(find test -path test/dummy -prune -o -name '*_test.rb' -print | sort)
+          shard_files=()
+          for index in "${!test_files[@]}"; do
+            if ((index % 4 == ${{ matrix.shard }})); then
+              shard_files+=("${test_files[$index]}")
+            fi
+          done
+          bin/rails test "${shard_files[@]}"
 
       - name: Keep SQL Server logs
         if: failure()
