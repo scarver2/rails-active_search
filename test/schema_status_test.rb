@@ -12,7 +12,8 @@ class SchemaStatusTest < ActiveSupport::TestCase
 
     verification = ActiveSearch::Schema.verify(@index)
 
-    assert_equal 1, ActiveSearch::Schema.population_of(@index, verification)
+    timeout = store_adapter_name == :sqlserver ? 15 : nil
+    assert_equal 1, ActiveSearch::Schema.population_of(@index, verification, timeout: timeout)
   end
 
   test "a missing index counts nothing rather than guessing zero" do

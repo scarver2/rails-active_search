@@ -29,7 +29,11 @@ module ActiveSearch
             table = connection.quote_table_name(model.table_name)
             columns = query_context.fields.map { |field| connection.quote_column_name(field) }
             column_list = columns.one? ? columns.first : "(#{columns.join(', ')})"
-            search = connection.quote(sanitize_contains_query(query_context.query.to_s))
+            sanitized_query = sanitize_contains_query(query_context.query.to_s,
+              stopwords: fulltext_stopwords(connection))
+            return model.none.select(Arel.sql(id_select_sql(model, index)), "0 AS score") if sanitized_query.blank?
+
+            search = connection.quote(sanitized_query)
             fulltext = "CONTAINSTABLE(#{table}, #{column_list}, #{search}) AS [active_search_fts]"
             primary_key = connection.quote_column_name(model.primary_key)
 
@@ -56,7 +60,7 @@ module ActiveSearch
 
           # Active Search does not expose SQL Server's full CONTAINS grammar. Quoting each plain
           # term keeps operators and punctuation as data, while preserving a balanced user phrase.
-          def sanitize_contains_query(query)
+          def sanitize_contains_query(query, stopwords: {})
             terms = []
             remaining = query.dup
 
@@ -66,7 +70,7 @@ module ActiveSearch
                 remaining = phrase.post_match
               elsif (word = remaining.match(/\A(\S+)/))
                 term = word[1].delete('"').sub(/\A[+\-~<>]+/, "")
-                terms << quote_contains_term(term) unless term.blank?
+                terms << quote_contains_term(term) unless term.blank? || stopwords.key?(term.downcase)
                 remaining = word.post_match
               else
                 remaining = remaining.lstrip
@@ -74,6 +78,14 @@ module ActiveSearch
             end
 
             terms.join(" AND ")
+          end
+
+          def fulltext_stopwords(connection)
+            @fulltext_stopwords ||= connection.select_values(<<~SQL.squish).index_with(true)
+              SELECT stopword
+              FROM sys.fulltext_system_stopwords
+              WHERE language_id = 1033
+            SQL
           end
 
           def quote_contains_term(term)

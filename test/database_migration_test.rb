@@ -35,6 +35,7 @@ class DatabaseMigrationTest < ActiveSupport::TestCase
 
       index.store.write(index, ActiveSearch::Document.new(id: 1, definition: index.definition,
         data: { title: "ruby collections", account_id: 1, folder_ids: [ 3, 7 ], labels: %w[ red blue ] }))
+      index.store.refresh(index.name) if index.store.respond_to?(:refresh)
 
       assert_equal 1, index.search("ruby").results.total, "the text half of the index does not answer"
       assert_equal 1, index.all.filter(folder_ids: 7).results.total, "the collection column does not filter"

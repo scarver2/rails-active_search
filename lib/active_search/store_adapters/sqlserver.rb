@@ -46,6 +46,12 @@ module ActiveSearch
         "fulltext"
       end
 
+      # SQL Server stores Rails JSON columns as nvarchar(max), which Active Record reports as a
+      # string column even though OPENJSON provides collection semantics when querying it.
+      def expected_native_type(field)
+        field.multiple? ? "string" : super
+      end
+
       def observe_tables(index, table, connection)
         searchable = connection.select_values(<<~SQL.squish)
           SELECT columns.name
