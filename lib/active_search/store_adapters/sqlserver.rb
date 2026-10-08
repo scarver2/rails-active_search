@@ -154,16 +154,12 @@ module ActiveSearch
 
             sleep 0.05
           end
-
-          # SQL Server can report the crawl complete just before CONTAINSTABLE sees its new
-          # fragment. Give the full-text host time to publish that fragment before returning.
-          sleep options.fetch(:publication_delay, 1)
         end
 
         def start_population(connection, table_name)
           quoted_table = connection.quote_table_name(table_name)
 
-          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START FULL POPULATION")
+          connection.execute("ALTER FULLTEXT INDEX ON #{quoted_table} START UPDATE POPULATION")
         end
 
         def fulltext_key_index_name(table_name)
